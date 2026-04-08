@@ -308,6 +308,14 @@
             <div class="day-btn" id="btn-목" onclick="selectDay('목')">목</div>
             <div class="day-btn" id="btn-금" onclick="selectDay('금')">금</div>
         </div>
+        
+        <!-- 유진이 시간표 복사 버튼 (유정 탭에서만 보임) -->
+        <div id="copy-schedule-container" style="display: none; margin-bottom: 15px; text-align: center;">
+            <button onclick="copyYujinSchedule()" style="background: #eef2f5; color: var(--primary-dark); border: 1px solid #d0d7de; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.1s;">
+                👯‍♀️ 유진이의 오늘 시간표 그대로 가져오기
+            </button>
+        </div>
+
         <div class="timeline" id="timeline-container">
             <!-- JS로 렌더링 -->
         </div>
@@ -586,6 +594,14 @@
         const container = document.getElementById('timeline-container');
         container.innerHTML = '';
         
+        // 유정 탭일 때만 '복사 버튼' 보이기
+        const copyBtnContainer = document.getElementById('copy-schedule-container');
+        if (appState.currentTab === '김유정') {
+            copyBtnContainer.style.display = 'block';
+        } else {
+            copyBtnContainer.style.display = 'none';
+        }
+
         const schedule = appState.db[appState.currentTab][appState.currentDay] || {};
         const currentMember = members.find(m => m.id === appState.currentTab);
         const currentTimes = currentMember.type === 'parent' ? parentTimes : kidTimes;
@@ -695,6 +711,25 @@
         if (!customTask) { showToast('일정 내용을 입력해주세요!'); return; }
         if (!scheduleCards.includes(customTask)) scheduleCards.push(customTask);
         assignCard(customTask);
+    };
+
+    // 👯‍♀️ 유진이 시간표 복사 기능
+    window.copyYujinSchedule = async function() {
+        const docRef = doc(db, "schedules", "김유정");
+        const updateData = {};
+        
+        // 유진이의 현재 요일 시간표를 모두 가져와서 유정이에게 매핑
+        kidTimes.forEach(time => {
+            const yujinTask = appState.db['김유진'][appState.currentDay][time];
+            // 일정이 있으면 복사, 없으면 삭제 처리 (완벽한 동기화를 위해)
+            updateData[time] = yujinTask ? yujinTask : deleteField();
+        });
+
+        await setDoc(docRef, {
+            [appState.currentDay]: updateData
+        }, { merge: true });
+        
+        showToast(`유진이의 ${appState.currentDay}요일 시간표를 가져왔습니다! 👯‍♀️`);
     };
 
     // 🔥 Firebase에 데이터를 저장하는 로직
