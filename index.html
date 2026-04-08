@@ -111,7 +111,7 @@
         /* --- 메인 페이지 (현재 상태) --- */
         .main-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;}
         .main-header h2 { margin: 0; font-size: 1.5rem; color: var(--text-main); }
-        .main-time { font-size: 0.9rem; color: var(--text-sub); font-weight: normal;}
+        .main-time { font-size: 0.9rem; color: var(--text-sub); font-weight: normal; text-align: right;}
 
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .status-card { 
@@ -277,9 +277,6 @@
         @keyframes toastFadeIn { from { opacity: 0; bottom: 70px; } to { opacity: 1; bottom: 90px; } }
         @keyframes toastFadeOut { from { opacity: 1; } to { opacity: 0; } }
 
-        .test-alarm-panel {
-            background: #fff3e0; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px dashed #ffb74d; text-align: center;
-        }
     </style>
 </head>
 <body>
@@ -293,18 +290,9 @@
 
     <!-- 메인 탭 (대시보드) -->
     <div id="view-main" class="content active">
-        
-        <!-- 알림 테스트 패널 (개발/테스트용) -->
-        <div class="test-alarm-panel">
-            <h4 style="margin:0 0 10px 0; color:#e65100;">⏱️ 알림 로직 테스트</h4>
-            <p style="font-size:0.85rem; color:#666; margin:0 0 10px 0; word-break:keep-all;">유진이의 시간표에 15:30(수학학원), 16:00(수학학원)이 연속으로 등록되어 있습니다. 15시 기준(첫타임 30분전)과 15시 30분 기준(연속타임 30분전)으로 알림이 어떻게 작동하는지 테스트해보세요.</p>
-            <button onclick="testAlarmLogic('15:30')" style="padding:8px 12px; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer;">첫 타임 알림 테스트</button>
-            <button onclick="testAlarmLogic('16:00')" style="padding:8px 12px; background:#9E9E9E; color:white; border:none; border-radius:8px; cursor:pointer;">연속 타임 알림 테스트</button>
-        </div>
-
         <div class="main-header">
             <h2><span id="current-date-display" style="font-size:1.0rem; color:var(--text-sub); display:block; margin-bottom:5px;"></span><span id="current-day-display">월요일</span> 일정</h2>
-            <div class="main-time" id="real-time-clock">14:00 기준</div>
+            <div class="main-time" id="real-time-clock">현재 시간 계산중...</div>
         </div>
         <div class="status-grid" id="main-status-container">
             <!-- JS로 렌더링 -->
@@ -377,10 +365,10 @@
 <script type="module">
     // --- 0. Firebase 설정 및 초기화 ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
     import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
-    // 👉 여기에 Firebase 콘솔에서 복사한 설정값을 덮어쓰세요!
+    // 본인의 Firebase 콘솔 설정값
     const firebaseConfig = {
         apiKey: "AIzaSyDHIPeTOFPbMBw8A6L7VWGruxS3c70sPqg",
         authDomain: "youfamily.firebaseapp.com",
@@ -420,7 +408,6 @@
         '운동관람', '병원'
     ];
 
-    // 카드별 아이콘 매핑 (귀여운 그림)
     const cardIcons = {
         '회사': '🏢', '학교(5교시)': '🏫', '학교(6교시)': '🏫', '수학학원': '📐',
         '피아노학원': '🎹', '속독학원': '📖', '영어학원': '🔤', '줄넘기학원': '🏃‍♀️',
@@ -434,10 +421,10 @@
         '자전거': '🚲', '회식': '🍻', '운동관람': '🏟️', '병원': '🏥'
     };
 
-    // 상태 관리 (인메모리 DB)
+    // 상태 관리 
     let appState = {
         currentTab: 'main', 
-        currentDay: '화', // 테스트를 위해 화요일로 강제 설정
+        currentDay: '', // init() 함수에서 실제 오늘 요일로 설정됨
         targetTimeSlot: '',
         modalMode: 'schedule', 
         modalTargetMember: '',
@@ -445,28 +432,43 @@
         db: {}
     };
 
-    // DB 초기화 및 데이터 삽입
+    // DB 초기 구조 세팅
     members.forEach(m => {
         appState.db[m.id] = {};
         appState.manualStatus[m.id] = null;
         days.forEach(d => { appState.db[m.id][d] = {}; });
     });
 
-    // 샘플 데이터 (화요일)
-    appState.db['김경태']['화']['17:30'] = '회사';
-    appState.db['이민하']['화']['17:30'] = '테니스';
-    
-    // **연속 학원 세팅 (테스트용)**
-    // 유진이가 15:30부터 16:30까지 2연속 수학학원입니다.
-    appState.db['김유진']['화']['15:00'] = '학교(6교시)';
-    appState.db['김유진']['화']['15:30'] = '수학학원';
-    appState.db['김유진']['화']['16:00'] = '수학학원'; 
-    appState.db['김유정']['화']['15:30'] = '피아노학원';
+    // 🔥 Firebase 실시간 동기화 (DB -> 화면)
+    // Firestore의 데이터를 가져오고, 변경될 때마다 화면을 자동으로 업데이트합니다.
+    members.forEach(member => {
+        onSnapshot(doc(db, "schedules", member.id), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                // 요일별 스케줄 가져오기
+                days.forEach(d => {
+                    appState.db[member.id][d] = data[d] || {};
+                });
+                // 수동 상태 가져오기
+                appState.manualStatus[member.id] = data.manualStatus || null;
+            } else {
+                // 데이터가 없을 경우 빈 값으로 초기화
+                days.forEach(d => { appState.db[member.id][d] = {}; });
+                appState.manualStatus[member.id] = null;
+            }
+            
+            // 데이터가 로드/변경되면 현재 보고 있는 화면을 다시 그립니다.
+            if (appState.currentTab === 'main') {
+                renderMainPage();
+            } else if (appState.currentTab === member.id) {
+                renderTimeline();
+            }
+        });
+    });
 
 
     // --- 2. 알림 관련 핵심 로직 ---
 
-    // (1) 브라우저 알림 권한 요청 (사라지지 않는 알림을 위해 필요)
     window.requestNotificationPermission = function() {
         if (!("Notification" in window)) {
             showToast("이 브라우저는 웹 알림을 지원하지 않습니다.");
@@ -475,7 +477,6 @@
         Notification.requestPermission().then(async function (permission) {
             if (permission === "granted") {
                 try {
-                    // 👉 아래 '본인의_VAPID_키_입력' 부분을 실제 VAPID 키로 교체하세요!
                     const token = await getToken(messaging, { vapidKey: 'BLHA9kwELav30QH1PPvRS4jTvp-Zs9p1zE38JIQaUnzTY_Q298cGh2XHfTuwR_5ao_iNSFxtkiM1Dj8PqsS88ms' });
                     console.log('푸시 토큰:', token);
                     
@@ -492,71 +493,6 @@
         });
     };
 
-    // (2) 화면에 계속 떠있는 알림 보내기 (requireInteraction)
-    function sendPersistentNotification(title, body) {
-        if ("Notification" in window && Notification.permission === "granted") {
-            // 권한이 있으면 실제 푸시 알림 발송
-            new Notification(title, {
-                body: body,
-                icon: 'https://cdn-icons-png.flaticon.com/512/3237/3237472.png', // 종소리 아이콘
-                requireInteraction: true // 핵심! 사용자가 닫기 전까지 화면에 계속 유지됨
-            });
-        } else {
-            // 권한이 없으면 앱 내부 토스트로 길게 보여줌
-            showToast(`[알림 시뮬레이션]<br><b>${title}</b><br>${body}<br><br>(실제 기기에서는 확인 시까지 사라지지 않습니다)`);
-        }
-    }
-
-    // (3) 타임슬롯이 연속된 '첫 타임'인지 체크하는 함수
-    function isFirstSlot(memberId, day, targetTimeSlot, taskName) {
-        const member = members.find(m => m.id === memberId);
-        const times = member.type === 'parent' ? parentTimes : kidTimes;
-        
-        const currentIndex = times.indexOf(targetTimeSlot);
-        
-        // 첫 번째 인덱스라면 무조건 첫 타임
-        if (currentIndex === 0) return true;
-        
-        if (currentIndex > 0) {
-            const previousTimeSlot = times[currentIndex - 1];
-            const previousTask = appState.db[memberId][day][previousTimeSlot];
-            
-            // 앞 타임의 일정이 지금 일정과 '완벽히 동일'하다면 연강이므로 첫 타임이 아님
-            if (previousTask === taskName) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // (4) 알림 로직 수동 테스트 함수
-    window.testAlarmLogic = function(targetTime) {
-        const day = '화';
-        let alarmedCount = 0;
-
-        members.forEach(member => {
-            const task = appState.db[member.id][day][targetTime];
-            
-            // 일정이 있고 '학원'이라는 단어가 포함되어 있다면
-            if (task && task.includes('학원')) {
-                // 연속 타임 체크 (첫 타임인지 확인)
-                if (isFirstSlot(member.id, day, targetTime, task)) {
-                    sendPersistentNotification(
-                        '학원 갈 시간이야! ⏰',
-                        `${member.role}(이)의 [${task}] 일정이 30분 뒤(${targetTime})에 시작됩니다.`
-                    );
-                    alarmedCount++;
-                } else {
-                    console.log(`${member.id}의 ${targetTime} [${task}]는 연속된 일정이라 알림을 생략합니다.`);
-                }
-            }
-        });
-
-        if (alarmedCount === 0 && targetTime === '16:00') {
-            showToast("수학학원 연강 중이라 알림이 울리지 않았습니다! (콘솔로그 확인)");
-        }
-    }
-
 
     // --- 3. 초기화 및 UI 로직 ---
     function init() {
@@ -566,25 +502,57 @@
         const day = date.getDate();
         document.getElementById('current-date-display').innerText = `${year}년 ${month}월 ${day}일`;
 
+        // 실제 오늘 요일 계산 (주말이면 월요일로)
         const dayMap = ['일', '월', '화', '수', '목', '금', '토'];
-        // 데모를 위해 요일은 화요일로 고정 (appState.currentDay 유지)
-        document.getElementById('current-day-display').innerText = `화요일 (테스트용)`;
+        let today = dayMap[date.getDay()];
+        if (today === '토' || today === '일') today = '월';
         
+        appState.currentDay = today;
+        document.getElementById('current-day-display').innerText = `${today}요일`;
+        
+        // 화면을 1분에 한 번씩 갱신하여 시간을 정확히 맞춤
+        updateTimeClock();
+        setInterval(updateTimeClock, 60000);
+
+        // 첫 렌더링 호출
+        renderMainPage();
+    }
+
+    // 현재 시간에 맞는 '타임슬롯'을 계산하는 함수
+    function getCurrentTimeSlot() {
+        const date = new Date();
+        const hours = String(date.getHours()).padStart(2, '0');
+        // 30분 단위 절사 (예: 14:28 -> 14:00, 14:45 -> 14:30)
+        const minutes = date.getMinutes() >= 30 ? '30' : '00';
+        return `${hours}:${minutes}`;
+    }
+
+    function updateTimeClock() {
+        const date = new Date();
         const hours = String(date.getHours()).padStart(2, '0');
         const minutes = String(date.getMinutes()).padStart(2, '0');
-        document.getElementById('real-time-clock').innerText = `현재 시간 ${hours}:${minutes}`;
-
-        renderMainPage();
+        const currentSlot = getCurrentTimeSlot();
+        
+        document.getElementById('real-time-clock').innerHTML = `현재 시간 <b>${hours}:${minutes}</b><br><span style="font-size:0.8rem; color:#aaa;">(${currentSlot} 기준)</span>`;
+        
+        // 메인 탭을 보고 있다면 상태 화면도 갱신
+        if(appState.currentTab === 'main') {
+            renderMainPage();
+        }
     }
     
     function renderMainPage() {
         const container = document.getElementById('main-status-container');
         container.innerHTML = '';
-        const targetTime = '15:30'; // 데모 고정
+        
+        // 실제 현재 시간에 맞는 슬롯 데이터를 가져옵니다.
+        const targetTime = getCurrentTimeSlot(); 
 
         members.forEach(member => {
             const manualTask = appState.manualStatus[member.id];
-            const scheduledTask = appState.db[member.id][appState.currentDay][targetTime];
+            // 요일 데이터가 없으면 방어(빈 객체 참조)
+            const todayData = appState.db[member.id][appState.currentDay] || {};
+            const scheduledTask = todayData[targetTime];
             
             let task = '일정 없음';
             let isManual = false;
@@ -617,7 +585,8 @@
     function renderTimeline() {
         const container = document.getElementById('timeline-container');
         container.innerHTML = '';
-        const schedule = appState.db[appState.currentTab][appState.currentDay];
+        
+        const schedule = appState.db[appState.currentTab][appState.currentDay] || {};
         const currentMember = members.find(m => m.id === appState.currentTab);
         const currentTimes = currentMember.type === 'parent' ? parentTimes : kidTimes;
 
@@ -661,7 +630,7 @@
 
     window.selectDay = function(day) {
         appState.currentDay = day;
-        document.getElementById('current-day-display').innerText = `${day}요일 (테스트용)`;
+        document.getElementById('current-day-display').innerText = `${day}요일`;
         if (appState.currentTab === 'main') renderMainPage();
         else renderTimeline();
     };
@@ -728,21 +697,32 @@
         assignCard(customTask);
     };
 
-    window.assignCard = function(cardName) {
+    // 🔥 Firebase에 데이터를 저장하는 로직
+    window.assignCard = async function(cardName) {
         if (appState.modalMode === 'schedule') {
-            appState.db[appState.currentTab][appState.currentDay][appState.targetTimeSlot] = cardName;
-            renderTimeline(); 
+            const docRef = doc(db, "schedules", appState.currentTab);
+            
+            // Firestore에 저장 (입력값이 빈 문자열이면 DB에서 해당 시간 삭제 처리)
+            await setDoc(docRef, {
+                [appState.currentDay]: {
+                    [appState.targetTimeSlot]: cardName === '' ? deleteField() : cardName
+                }
+            }, { merge: true });
+            
             showToast(cardName === '' ? '일정이 삭제되었습니다.' : `[${cardName}] 일정이 추가되었습니다.`);
+            
         } else if (appState.modalMode === 'main') {
+            const docRef = doc(db, "schedules", appState.modalTargetMember);
+            
             if (cardName === '__AUTO__') {
-                appState.manualStatus[appState.modalTargetMember] = null;
+                await setDoc(docRef, { manualStatus: deleteField() }, { merge: true });
                 showToast('시간표 상태로 돌아갔습니다.');
             } else {
-                appState.manualStatus[appState.modalTargetMember] = cardName;
+                await setDoc(docRef, { manualStatus: cardName }, { merge: true });
                 showToast(`현재 상태가 [${cardName}](으)로 변경되었습니다.`);
             }
-            renderMainPage();
         }
+        
         closeModalDirect();
     };
 
@@ -758,6 +738,7 @@
         }, 4000);
     }
 
+    // 앱 구동
     init();
 </script>
 </body>
