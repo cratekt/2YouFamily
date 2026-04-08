@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>우리가족 시간표</title>
+    <style>
+        /* 기본 변수 및 리셋 */
+        :root { 
+            --primary: #4A90E2; 
+            --primary-dark: #357ABD;
+            --bg: #f0f4f8; 
+            --card-bg: #ffffff; 
+            --text-main: #333333;
+            --text-sub: #888888;
+        }
+        
+        body { 
+            font-family: 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif; 
+            margin: 0; 
+            background-color: #e0e5ec;
+            color: var(--text-main); 
+            display: flex;
+            justify-content: center;
+        }
+
+        /* 모바일 화면 사이즈 래퍼 */
+        .app-container {
+            width: 100%;
+            max-width: 480px; 
+            min-height: 100vh;
+            background-color: var(--bg);
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            padding-bottom: 70px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+        
+        /* 상단 네비게이션 바 */
+        .navbar { 
+            display: flex; 
+            background: var(--primary); 
+            color: white; 
+            padding: 18px 20px; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 10px rgba(74, 144, 226, 0.3);
+        }
+
+        .noti-btn { 
+            background: #ffeb3b; 
+            border: none; 
+            padding: 8px 12px; 
+            border-radius: 20px; 
+            font-weight: 700; 
+            font-size: 0.85rem; 
+            cursor: pointer; 
+            color: #d84315; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        .noti-btn:active { transform: scale(0.95); }
+        
+        /* 하단 탭 메뉴 */
+        .tab-bar { 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            max-width: 480px;
+            background: white; 
+            display: flex; 
+            justify-content: space-around; 
+            padding: 10px 0; 
+            box-shadow: 0 -2px 15px rgba(0,0,0,0.05); 
+            border-top: 1px solid #eee; 
+            z-index: 100;
+            border-radius: 20px 20px 0 0;
+        }
+        .tab-btn { 
+            background: none; 
+            border: none; 
+            font-size: 0.8rem; 
+            color: var(--text-sub); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 6px; 
+            cursor: pointer; 
+            padding: 5px; 
+            flex: 1;
+        }
+        .tab-icon { font-size: 1.5rem; transition: transform 0.2s;}
+        .tab-btn.active { color: var(--primary); font-weight: 800; }
+        .tab-btn.active .tab-icon { transform: translateY(-3px) scale(1.1); }
+        
+        /* 컨텐츠 영역 */
+        .content { padding: 20px; display: none; animation: fadeIn 0.3s; }
+        .content.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* --- 메인 페이지 (현재 상태) --- */
+        .main-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;}
+        .main-header h2 { margin: 0; font-size: 1.5rem; color: var(--text-main); }
+        .main-time { font-size: 0.9rem; color: var(--text-sub); font-weight: normal;}
+
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .status-card { 
+            background: var(--card-bg); 
+            padding: 15px; 
+            border-radius: 20px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); 
+            text-align: center; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #f0f0f0;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .status-card:active { transform: scale(0.96); }
+        .status-header { display: flex; align-items: center; gap: 5px; font-size: 0.95rem; color: var(--text-sub); width: 100%; justify-content: center; }
+        .status-image { font-size: 3.5rem; margin: 15px 0 10px 0; text-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .status-text { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--primary); word-break: keep-all; }
+        .manual-badge { position: absolute; top: 10px; right: 10px; background: #ffeb3b; color: #d84315; font-size: 0.7rem; font-weight: bold; padding: 4px 8px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* --- 시간표 페이지 --- */
+        .day-selector { display: flex; justify-content: space-between; margin-bottom: 20px; background: white; padding: 5px; border-radius: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);}
+        .day-btn { padding: 10px 0; flex: 1; text-align: center; border-radius: 20px; cursor: pointer; color: var(--text-sub); font-weight: bold; font-size: 0.95rem; transition: 0.2s;}
+        .day-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);}
+        
+        .timeline { display: flex; flex-direction: column; gap: 12px; }
+        .time-slot { 
+            display: flex; 
+            align-items: center; 
+            background: white; 
+            padding: 18px 20px; 
+            border-radius: 15px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03); 
+            cursor: pointer; 
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .time-slot:active { transform: scale(0.98); background: #fafafa; }
+        .time-label { width: 70px; font-weight: 800; color: var(--primary); font-size: 1.1rem;}
+        .slot-content { flex: 1; text-align: right; color: #ccc; font-size: 1.05rem;}
+        .slot-content.filled { color: var(--text-main); font-weight: bold; }
+
+        /* --- 모달 (일정 선택 팝업) --- */
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.6); 
+            z-index: 200; 
+            justify-content: center; 
+            align-items: flex-end; 
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .modal.show { opacity: 1; }
+        
+        .modal-content { 
+            background: var(--bg); 
+            width: 100%; 
+            max-width: 480px; 
+            padding: 25px 20px 30px 20px; 
+            border-radius: 25px 25px 0 0; 
+            box-sizing: border-box; 
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            box-shadow: 0 -10px 20px rgba(0,0,0,0.1);
+        }
+        .modal.show .modal-content { transform: translateY(0); }
+
+        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: 800; font-size: 1.3rem; color: var(--text-main);}
+        .close-btn { color: var(--text-sub); cursor: pointer; font-size: 1.5rem; line-height: 1;}
+        
+        .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 50vh; overflow-y: auto; padding-bottom: 10px;}
+        .schedule-card { 
+            padding: 15px 10px; 
+            border-radius: 15px; 
+            border: none; 
+            background: white; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            font-size: 0.95rem; 
+            font-weight: bold;
+            color: var(--text-main);
+            cursor: pointer; 
+            transition: 0.1s; 
+            word-break: keep-all;
+        }
+        .schedule-card:active { background: var(--primary); color: white; transform: scale(0.95);}
+        
+        .btn-delete { 
+            width: 100%; 
+            padding: 16px; 
+            margin-top: 15px; 
+            background: #ffebee; 
+            color: #d32f2f; 
+            border: 1px solid #ffcdd2; 
+            border-radius: 15px; 
+            font-size: 1.1rem; 
+            font-weight: bold;
+            cursor: pointer; 
+        }
+        .btn-delete:active { background: #ffcdd2; }
+
+        /* 직접 입력 폼 스타일 */
+        .custom-input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #ddd;
+        }
+        .custom-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .custom-input:focus {
+            border-color: var(--primary);
+        }
+        .btn-add-custom {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 0 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .btn-add-custom:active {
+            transform: scale(0.95);
+        }
+
+        /* 커스텀 토스트 메시지 */
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(50, 50, 50, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 300;
+            display: none;
+            text-align: center;
+            width: max-content;
+            max-width: 80%;
+        }
+        .toast.show {
+            display: block;
+            animation: toastFadeIn 0.3s, toastFadeOut 0.3s 3.7s forwards;
+        }
+        @keyframes toastFadeIn { from { opacity: 0; bottom: 70px; } to { opacity: 1; bottom: 90px; } }
+        @keyframes toastFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        .test-alarm-panel {
+            background: #fff3e0; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px dashed #ffb74d; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 상단 바 -->
+    <div class="navbar">
+        <span id="top-title">우리 가족은 지금?</span>
+        <button class="noti-btn" id="auth-btn" onclick="requestNotificationPermission()">알림 권한 켜기 🔔</button>
+    </div>
+
+    <!-- 메인 탭 (대시보드) -->
+    <div id="view-main" class="content active">
+        
+        <!-- 알림 테스트 패널 (개발/테스트용) -->
+        <div class="test-alarm-panel">
+            <h4 style="margin:0 0 10px 0; color:#e65100;">⏱️ 알림 로직 테스트</h4>
+            <p style="font-size:0.85rem; color:#666; margin:0 0 10px 0; word-break:keep-all;">유진이의 시간표에 15:30(수학학원), 16:00(수학학원)이 연속으로 등록되어 있습니다. 15시 기준(첫타임 30분전)과 15시 30분 기준(연속타임 30분전)으로 알림이 어떻게 작동하는지 테스트해보세요.</p>
+            <button onclick="testAlarmLogic('15:30')" style="padding:8px 12px; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer;">첫 타임 알림 테스트</button>
+            <button onclick="testAlarmLogic('16:00')" style="padding:8px 12px; background:#9E9E9E; color:white; border:none; border-radius:8px; cursor:pointer;">연속 타임 알림 테스트</button>
+        </div>
+
+        <div class="main-header">
+            <h2><span id="current-date-display" style="font-size:1.0rem; color:var(--text-sub); display:block; margin-bottom:5px;"></span><span id="current-day-display">월요일</span> 일정</h2>
+            <div class="main-time" id="real-time-clock">14:00 기준</div>
+        </div>
+        <div class="status-grid" id="main-status-container">
+            <!-- JS로 렌더링 -->
+        </div>
+    </div>
+
+    <!-- 개인 시간표 탭 -->
+    <div id="view-schedule" class="content">
+        <div class="day-selector" id="day-buttons">
+            <div class="day-btn" id="btn-월" onclick="selectDay('월')">월</div>
+            <div class="day-btn" id="btn-화" onclick="selectDay('화')">화</div>
+            <div class="day-btn" id="btn-수" onclick="selectDay('수')">수</div>
+            <div class="day-btn" id="btn-목" onclick="selectDay('목')">목</div>
+            <div class="day-btn" id="btn-금" onclick="selectDay('금')">금</div>
+        </div>
+        <div class="timeline" id="timeline-container">
+            <!-- JS로 렌더링 -->
+        </div>
+    </div>
+
+    <!-- 하단 탭 메뉴 -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('main', '메인', this)">
+            <span class="tab-icon">🏠</span>
+            <span>메인</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('김경태', '아빠', this)">
+            <span class="tab-icon">👨🏻</span>
+            <span>아빠늘보</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('이민하', '엄마', this)">
+            <span class="tab-icon">👩🏻</span>
+            <span>엄마랑이</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('김유진', '유진', this)">
+            <span class="tab-icon">👧🏻</span>
+            <span>유진아리</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('김유정', '유정', this)">
+            <span class="tab-icon">🧒🏻</span>
+            <span>유정슝이</span>
+        </button>
+    </div>
+
+    <!-- 일정 선택 모달 -->
+    <div class="modal" id="card-modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span id="modal-time-title">14:00 일정 선택</span>
+                <span class="close-btn" onclick="closeModalDirect()">✕</span>
+        </div>
+        <div class="card-grid" id="card-list">
+            <!-- JS로 렌더링 -->
+        </div>
+        <div class="custom-input-container">
+            <input type="text" id="custom-card-input" class="custom-input" placeholder="직접 입력하기...">
+            <button class="btn-add-custom" onclick="addCustomCard()">추가</button>
+        </div>
+        <div id="modal-action-btns">
+            <button class="btn-delete" onclick="assignCard('')">🗑 일정 지우기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 커스텀 토스트 알림창 -->
+    <div id="custom-toast" class="toast">메시지</div>
+
+</div>
+
+<script type="module">
+    // --- 0. Firebase 설정 및 초기화 ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
+
+    // 👉 여기에 Firebase 콘솔에서 복사한 설정값을 덮어쓰세요!
+    const firebaseConfig = {
+        apiKey: "AIzaSyDHIPeTOFPbMBw8A6L7VWGruxS3c70sPqg",
+        authDomain: "youfamily.firebaseapp.com",
+        projectId: "youfamily",
+        storageBucket: "youfamily.firebasestorage.app",
+        messagingSenderId: "590116385195",
+        appId: "1:590116385195:web:12dbd6aefb3975d508e2ee",
+        measurementId: "G-J33ZYG20ZZ"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const messaging = getMessaging(app);
+
+    // --- 1. 기본 데이터 세팅 ---
+    const members = [
+        { id: '김경태', role: '아빠늘보', icon: '👨🏻', type: 'parent' },
+        { id: '이민하', role: '민하랑이', icon: '👩🏻', type: 'parent' },
+        { id: '김유진', role: '유진아리', icon: '👧🏻', type: 'kid' },
+        { id: '김유정', role: '유정슝이', icon: '🧒🏻', type: 'kid' }
+    ];
+    
+    const days = ['월', '화', '수', '목', '금'];
+    
+    // 부모님과 아이들의 시간표 기준 분리
+    const parentTimes = ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'];
+    const kidTimes = ['13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'];
+    
+    const scheduleCards = [
+        '회사', '학교(5교시)', '학교(6교시)', '수학학원', '피아노학원', 
+        '속독학원', '영어학원', '줄넘기학원', '테니스', '필라테스', 
+        '휴식중', '고양이로변신중', '저녁식사', '가족회의', '숙제중',
+        '할머니집', '쇼핑중', '친구들과 놀아요', '이동중', '운전중', '놀이터', 
+        '롯데월드', '다이소', '싸워서말안함', '시체놀이중', '낮잠중', '독서중', 
+        '유투브/패드', '만들기중', '쇼츠제작중', '친구집', '게임중', 
+        '스트레스폭발경고', '연락금지!', '다시태어나는중', '자전거', '회식', 
+        '운동관람', '병원'
+    ];
+
+    // 카드별 아이콘 매핑 (귀여운 그림)
+    const cardIcons = {
+        '회사': '🏢', '학교(5교시)': '🏫', '학교(6교시)': '🏫', '수학학원': '📐',
+        '피아노학원': '🎹', '속독학원': '📖', '영어학원': '🔤', '줄넘기학원': '🏃‍♀️',
+        '테니스': '🎾', '필라테스': '🧘‍♀️', '휴식중': '🛋️', '고양이로변신중': '🐱',
+        '저녁식사': '🍽️', '가족회의': '👨‍👩‍👧‍👧', '숙제중': '✍️', '일정 없음': '💤',
+        '할머니집': '👵', '쇼핑중': '🛍️', '친구들과 놀아요': '👯‍♀️', '이동중': '🚌',
+        '운전중': '🚗', '놀이터': '🛝', '롯데월드': '🎢', '다이소': '🧺',
+        '싸워서말안함': '🤐', '시체놀이중': '👻', '낮잠중': '😴', '독서중': '📚',
+        '유투브/패드': '📱', '만들기중': '🎨', '쇼츠제작중': '🎬', '친구집': '🏠',
+        '게임중': '🎮', '스트레스폭발경고': '🌋', '연락금지!': '📵', '다시태어나는중': '🐣',
+        '자전거': '🚲', '회식': '🍻', '운동관람': '🏟️', '병원': '🏥'
+    };
+
+    // 상태 관리 (인메모리 DB)
+    let appState = {
+        currentTab: 'main', 
+        currentDay: '화', // 테스트를 위해 화요일로 강제 설정
+        targetTimeSlot: '',
+        modalMode: 'schedule', 
+        modalTargetMember: '',
+        manualStatus: {}, 
+        db: {}
+    };
+
+    // DB 초기화 및 데이터 삽입
+    members.forEach(m => {
+        appState.db[m.id] = {};
+        appState.manualStatus[m.id] = null;
+        days.forEach(d => { appState.db[m.id][d] = {}; });
+    });
+
+    // 샘플 데이터 (화요일)
+    appState.db['김경태']['화']['17:30'] = '회사';
+    appState.db['이민하']['화']['17:30'] = '테니스';
+    
+    // **연속 학원 세팅 (테스트용)**
+    // 유진이가 15:30부터 16:30까지 2연속 수학학원입니다.
+    appState.db['김유진']['화']['15:00'] = '학교(6교시)';
+    appState.db['김유진']['화']['15:30'] = '수학학원';
+    appState.db['김유진']['화']['16:00'] = '수학학원'; 
+    appState.db['김유정']['화']['15:30'] = '피아노학원';
+
+
+    // --- 2. 알림 관련 핵심 로직 ---
+
+    // (1) 브라우저 알림 권한 요청 (사라지지 않는 알림을 위해 필요)
+    window.requestNotificationPermission = function() {
+        if (!("Notification" in window)) {
+            showToast("이 브라우저는 웹 알림을 지원하지 않습니다.");
+            return;
+        }
+        Notification.requestPermission().then(async function (permission) {
+            if (permission === "granted") {
+                try {
+                    // 👉 아래 '본인의_VAPID_키_입력' 부분을 실제 VAPID 키로 교체하세요!
+                    const token = await getToken(messaging, { vapidKey: 'BLHA9kwELav30QH1PPvRS4jTvp-Zs9p1zE38JIQaUnzTY_Q298cGh2XHfTuwR_5ao_iNSFxtkiM1Dj8PqsS88ms' });
+                    console.log('푸시 토큰:', token);
+                    
+                    document.getElementById('auth-btn').innerText = "알림 설정 완료 ✅";
+                    document.getElementById('auth-btn').style.background = "#e0e0e0";
+                    showToast("알림이 활성화되었습니다!");
+                } catch (error) {
+                    console.error("푸시 토큰 에러:", error);
+                    showToast("알림 설정 중 오류가 발생했습니다.");
+                }
+            } else {
+                showToast("알림 권한이 거부되었습니다.");
+            }
+        });
+    };
+
+    // (2) 화면에 계속 떠있는 알림 보내기 (requireInteraction)
+    function sendPersistentNotification(title, body) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            // 권한이 있으면 실제 푸시 알림 발송
+            new Notification(title, {
+                body: body,
+                icon: 'https://cdn-icons-png.flaticon.com/512/3237/3237472.png', // 종소리 아이콘
+                requireInteraction: true // 핵심! 사용자가 닫기 전까지 화면에 계속 유지됨
+            });
+        } else {
+            // 권한이 없으면 앱 내부 토스트로 길게 보여줌
+            showToast(`[알림 시뮬레이션]<br><b>${title}</b><br>${body}<br><br>(실제 기기에서는 확인 시까지 사라지지 않습니다)`);
+        }
+    }
+
+    // (3) 타임슬롯이 연속된 '첫 타임'인지 체크하는 함수
+    function isFirstSlot(memberId, day, targetTimeSlot, taskName) {
+        const member = members.find(m => m.id === memberId);
+        const times = member.type === 'parent' ? parentTimes : kidTimes;
+        
+        const currentIndex = times.indexOf(targetTimeSlot);
+        
+        // 첫 번째 인덱스라면 무조건 첫 타임
+        if (currentIndex === 0) return true;
+        
+        if (currentIndex > 0) {
+            const previousTimeSlot = times[currentIndex - 1];
+            const previousTask = appState.db[memberId][day][previousTimeSlot];
+            
+            // 앞 타임의 일정이 지금 일정과 '완벽히 동일'하다면 연강이므로 첫 타임이 아님
+            if (previousTask === taskName) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // (4) 알림 로직 수동 테스트 함수
+    window.testAlarmLogic = function(targetTime) {
+        const day = '화';
+        let alarmedCount = 0;
+
+        members.forEach(member => {
+            const task = appState.db[member.id][day][targetTime];
+            
+            // 일정이 있고 '학원'이라는 단어가 포함되어 있다면
+            if (task && task.includes('학원')) {
+                // 연속 타임 체크 (첫 타임인지 확인)
+                if (isFirstSlot(member.id, day, targetTime, task)) {
+                    sendPersistentNotification(
+                        '학원 갈 시간이야! ⏰',
+                        `${member.role}(이)의 [${task}] 일정이 30분 뒤(${targetTime})에 시작됩니다.`
+                    );
+                    alarmedCount++;
+                } else {
+                    console.log(`${member.id}의 ${targetTime} [${task}]는 연속된 일정이라 알림을 생략합니다.`);
+                }
+            }
+        });
+
+        if (alarmedCount === 0 && targetTime === '16:00') {
+            showToast("수학학원 연강 중이라 알림이 울리지 않았습니다! (콘솔로그 확인)");
+        }
+    }
+
+
+    // --- 3. 초기화 및 UI 로직 ---
+    function init() {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        document.getElementById('current-date-display').innerText = `${year}년 ${month}월 ${day}일`;
+
+        const dayMap = ['일', '월', '화', '수', '목', '금', '토'];
+        // 데모를 위해 요일은 화요일로 고정 (appState.currentDay 유지)
+        document.getElementById('current-day-display').innerText = `화요일 (테스트용)`;
+        
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        document.getElementById('real-time-clock').innerText = `현재 시간 ${hours}:${minutes}`;
+
+        renderMainPage();
+    }
+    
+    function renderMainPage() {
+        const container = document.getElementById('main-status-container');
+        container.innerHTML = '';
+        const targetTime = '15:30'; // 데모 고정
+
+        members.forEach(member => {
+            const manualTask = appState.manualStatus[member.id];
+            const scheduledTask = appState.db[member.id][appState.currentDay][targetTime];
+            
+            let task = '일정 없음';
+            let isManual = false;
+            
+            if (manualTask) {
+                task = manualTask;
+                isManual = true;
+            } else if (scheduledTask) {
+                task = scheduledTask;
+            }
+            
+            const colorClass = task === '일정 없음' ? 'color: #aaa' : '';
+            const icon = cardIcons[task] || '✨';
+            const manualBadgeHtml = isManual ? '<div class="manual-badge">수동 설정</div>' : '';
+            
+            container.innerHTML += `
+                <div class="status-card" onclick="openMainModal('${member.id}')">
+                    ${manualBadgeHtml}
+                    <div class="status-header">
+                        <span>${member.icon}</span>
+                        <span>${member.id}</span>
+                    </div>
+                    <div class="status-image">${icon}</div>
+                    <p class="status-text" style="${colorClass}">${task}</p>
+                </div>
+            `;
+        });
+    }
+
+    function renderTimeline() {
+        const container = document.getElementById('timeline-container');
+        container.innerHTML = '';
+        const schedule = appState.db[appState.currentTab][appState.currentDay];
+        const currentMember = members.find(m => m.id === appState.currentTab);
+        const currentTimes = currentMember.type === 'parent' ? parentTimes : kidTimes;
+
+        currentTimes.forEach(time => {
+            const task = schedule[time];
+            const displayTask = task ? task : '터치하여 일정 추가 ➕';
+            const textClass = task ? 'filled' : '';
+            
+            container.innerHTML += `
+                <div class="time-slot" onclick="openModal('${time}')">
+                    <div class="time-label">${time}</div>
+                    <div class="slot-content ${textClass}">${displayTask}</div>
+                </div>
+            `;
+        });
+
+        document.querySelectorAll('.day-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.innerText === appState.currentDay);
+        });
+    }
+
+    window.switchTab = function(target, title, btnElement) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        appState.currentTab = target;
+
+        if(target === 'main') {
+            document.getElementById('view-main').classList.add('active');
+            document.getElementById('view-schedule').classList.remove('active');
+            document.getElementById('top-title').innerText = '우리 가족은 지금?';
+            renderMainPage();
+        } else {
+            document.getElementById('view-main').classList.remove('active');
+            document.getElementById('view-schedule').classList.add('active');
+            const memberObj = members.find(m => m.id === target);
+            document.getElementById('top-title').innerText = `${memberObj.icon} ${title}의 시간표`;
+            renderTimeline();
+        }
+    };
+
+    window.selectDay = function(day) {
+        appState.currentDay = day;
+        document.getElementById('current-day-display').innerText = `${day}요일 (테스트용)`;
+        if (appState.currentTab === 'main') renderMainPage();
+        else renderTimeline();
+    };
+
+    window.openModal = function(time) {
+        appState.modalMode = 'schedule';
+        appState.targetTimeSlot = time;
+        document.getElementById('modal-time-title').innerText = `${time} 일정 선택`;
+        document.getElementById('custom-card-input').value = ''; 
+        
+        const cardList = document.getElementById('card-list');
+        cardList.innerHTML = '';
+        scheduleCards.forEach(card => {
+            const icon = cardIcons[card] || '';
+            cardList.innerHTML += `<button class="schedule-card" onclick="assignCard('${card}')"><span style="font-size:1.2rem; display:block; margin-bottom:5px;">${icon}</span>${card}</button>`;
+        });
+        
+        document.getElementById('modal-action-btns').innerHTML = `<button class="btn-delete" onclick="assignCard('')">🗑 일정 지우기</button>`;
+        showModalAnim();
+    };
+
+    window.openMainModal = function(memberId) {
+        appState.modalMode = 'main';
+        appState.modalTargetMember = memberId;
+        const memberObj = members.find(m => m.id === memberId);
+        
+        document.getElementById('modal-time-title').innerText = `${memberObj.icon} ${memberObj.id} 상태 변경`;
+        document.getElementById('custom-card-input').value = ''; 
+        
+        const cardList = document.getElementById('card-list');
+        cardList.innerHTML = '';
+        scheduleCards.forEach(card => {
+            const icon = cardIcons[card] || '';
+            cardList.innerHTML += `<button class="schedule-card" onclick="assignCard('${card}')"><span style="font-size:1.2rem; display:block; margin-bottom:5px;">${icon}</span>${card}</button>`;
+        });
+        
+        document.getElementById('modal-action-btns').innerHTML = `
+            <button class="btn-delete" style="background: var(--primary); color: white; border-color: var(--primary);" onclick="assignCard('__AUTO__')">🔄 시간표대로 돌아가기</button>
+        `;
+        showModalAnim();
+    };
+
+    function showModalAnim() {
+        const modal = document.getElementById('card-modal');
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    window.closeModal = function(e) {
+        if(e.target.id === 'card-modal') closeModalDirect();
+    };
+    
+    window.closeModalDirect = function() {
+        const modal = document.getElementById('card-modal');
+        modal.classList.remove('show');
+        setTimeout(() => modal.style.display = 'none', 300);
+    }
+
+    window.addCustomCard = function() {
+        const inputEl = document.getElementById('custom-card-input');
+        const customTask = inputEl.value.trim();
+        if (!customTask) { showToast('일정 내용을 입력해주세요!'); return; }
+        if (!scheduleCards.includes(customTask)) scheduleCards.push(customTask);
+        assignCard(customTask);
+    };
+
+    window.assignCard = function(cardName) {
+        if (appState.modalMode === 'schedule') {
+            appState.db[appState.currentTab][appState.currentDay][appState.targetTimeSlot] = cardName;
+            renderTimeline(); 
+            showToast(cardName === '' ? '일정이 삭제되었습니다.' : `[${cardName}] 일정이 추가되었습니다.`);
+        } else if (appState.modalMode === 'main') {
+            if (cardName === '__AUTO__') {
+                appState.manualStatus[appState.modalTargetMember] = null;
+                showToast('시간표 상태로 돌아갔습니다.');
+            } else {
+                appState.manualStatus[appState.modalTargetMember] = cardName;
+                showToast(`현재 상태가 [${cardName}](으)로 변경되었습니다.`);
+            }
+            renderMainPage();
+        }
+        closeModalDirect();
+    };
+
+    function showToast(message) {
+        const toast = document.getElementById('custom-toast');
+        toast.innerHTML = message;
+        toast.classList.remove('show');
+        void toast.offsetWidth; 
+        toast.classList.add('show');
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 4000);
+    }
+
+    init();
+</script>
+</body>
+</html>
